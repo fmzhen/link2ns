@@ -47,8 +47,8 @@ func main() {
 	defer origns.Close()
 
 	// path name
-	path1 := prefix + "ns1"
-	path2 := prefix + "ns2"
+	path1 := prefix + "/ns1"
+	path2 := prefix + "/ns2"
 
 	CreateNamespaceFile(path1)
 	CreateNamespaceFile(path2)
@@ -74,26 +74,26 @@ func main() {
 	LoopbackUp()
 
 	//get ns1 namespace file
-	procNet := fmt.Sprintf("/proc/%d/task/%d/ns/net", os.Getpid(), syscall.Gettid())
+	procNet = fmt.Sprintf("/proc/%d/task/%d/ns/net", os.Getpid(), syscall.Gettid())
 	if err := syscall.Mount(procNet, path2, "bind", syscall.MS_BIND, ""); err != nil {
 		fmt.Printf("error: %v", err)
 		return
 	}
 
 	// back root namespace，create veth pair
-	netns.Setns(origns)
+	netns.Set(origns)
 
-	vethdev := &netlink.Veth{netlink.LinkAttrs{Name: veth1}, veth2}
-	_ := netlink.LinkAdd(vethdev)
+	vethdev := &netlink.Veth{netlink.LinkAttrs{Name: "veth1"}, "veth2"}
+	netlink.LinkAdd(vethdev)
 
 	veth1, _ := netlink.LinkByName("veth1")
-	netlink.LinkSetNsFd(veth1, newns1)
+	netlink.LinkSetNsFd(veth1, int(newns1))
 
 	veth2, _ := netlink.LinkByName("veth2")
-	netlink.LinkSetNsFd(veth2, newns2)
+	netlink.LinkSetNsFd(veth2, int(newns2))
 
 	// join in ns1 ,configure veth1
-	netns.Setns(newns1)
+	netns.Set(newns1)
 	veth1, _ = netlink.LinkByName("veth1")
 	netlink.LinkSetName(veth1, "eth0")
 	addr, _ := netlink.ParseAddr("192.168.200.1/24")
@@ -101,10 +101,12 @@ func main() {
 	netlink.LinkSetUp(veth1)
 
 	//join in ns2 ,configure veth2
-	netns.Setns(newns2)
+	netns.Set(newns2)
 	veth1, _ = netlink.LinkByName("veth2")
 	netlink.LinkSetName(veth2, "eth0")
-	addr, _ := netlink.ParseAddr("192.168.200.2/24")
+	addr, _ = netlink.ParseAddr("192.168.200.2/24")
 	netlink.AddrAdd(veth2, addr)
 	netlink.LinkSetUp(veth2)
+
+	netns.Set(origns)
 }
